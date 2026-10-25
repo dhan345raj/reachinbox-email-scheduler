@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  name             String
+  avatar           String?
+  googleId         String   @unique
+  slackAccessToken String?
+  slackWebhookUrl  String?
+  slackChannelId   String?
+  slackTeamName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  senders Sender[]
+  batches Batch[]
+  emails  Email[]
+}
+
+model Sender {
+  id           String   @id @default(uuid())
+  userId       String
+  email        String
+  etherealUser String
+  etherealPass String
+  createdAt    DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails  Email[]
+  batches Batch[]
+
+  @@unique([userId, email])
+}
+
+model Batch {
+  id                  String   @id @default(uuid())
+  userId              String
+  senderId            String
+  subject             String
+  body                String   @db.Text
+  csvFileName         String?
+  totalEmails         Int
+  startTime           DateTime
+  delayBetweenSeconds Int
+  hourlyLimit         Int
+  status              String   @default("ACTIVE")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender Sender @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  emails Email[]
+}
+
+model Email {
+  id             String    @id @default(uuid())
+  userId         String
+  senderId       String
+  batchId        String
+  recipient      String
+  subject        String
+  body           String    @db.Text
+  scheduledAt    DateTime
+  sentAt         DateTime?
+  status         String    @default("SCHEDULED")
+  bullmqJobId    String?   @unique
+  idempotencyKey String    @unique
+  errorMessage   String?
+  etherealUrl    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender Sender @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  batch  Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([userId, status])
+}
